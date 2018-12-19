@@ -1,0 +1,24 @@
+kind: LDAPSyncConfig
+apiVersion: v1
+url: ldap://35.227.116.124:389
+insecure: true
+bindPassword: nangadef
+bindDN: cn=admin,dc=dakar,dc=io
+rfc2307:
+    groupsQuery:
+        baseDN: "ou=groups,dc=dakar,dc=io"
+        scope: sub
+        derefAliases: never
+        filter: (objectclass=groupOfNames)
+    groupUIDAttribute: dn
+    groupNameAttributes: [ cn ]
+    groupMembershipAttributes: [ member ]
+    usersQuery:
+        baseDN: "ou=users,dc=dakar,dc=io"
+        scope: sub
+        derefAliases: never
+        pageSize: 0
+    userUIDAttribute: dn
+    userNameAttributes: [ mail ]
+    tolerateMemberNotFoundErrors: false
+    tolerateMemberOutOfScopeErrors: false
