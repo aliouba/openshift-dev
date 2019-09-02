@@ -1,8 +1,8 @@
 kind: LDAPSyncConfig
 apiVersion: v1
-url: ldap://ldap.tools.dakar.io:389
+url: ldap://ldaphostname:389
 insecure: true
-bindPassword: nangadef
+bindPassword: xxxx
 bindDN: cn=admin,dc=dakar,dc=io
 rfc2307:
     groupsQuery:
