@@ -1,6 +1,6 @@
 kind: LDAPSyncConfig
 apiVersion: v1
-url: ldap://35.227.116.124:389
+url: ldap://ldap.tools.dakar.io:389
 insecure: true
 bindPassword: nangadef
 bindDN: cn=admin,dc=dakar,dc=io
