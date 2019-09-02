@@ -72,5 +72,19 @@ items:
 ```
 
 4. Import groups if you are happy
+```
+oc adm groups sync --sync-config=/etc/origin/master/groupsync.yaml --confirm
+```
+
+You should see OpenShift groups now:
+
+```
+oc get groups
+```
 5. Assign role to the Group
 
+E.g, to assign Cluster admin role to ocp-admin group
+
+```
+oc adm policy add-cluster-role-to-group cluster-admin  ocp-admin
+```
