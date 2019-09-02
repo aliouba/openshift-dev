@@ -89,8 +89,156 @@ E.g, to assign Cluster admin role to ocp-admin group
 oc adm policy add-cluster-role-to-group cluster-admin  ocp-admin
 ```
 
-# LimitRange
 # ResourceQuota
+
+	
+Quotas are set by cluster administrators and are scoped to a given project.
+
+```
+- apiVersion: v1
+  kind: ResourceQuota
+  metadata:
+    name: ${PROJECT_NAME}-quota (1)
+  spec:
+    hard:
+      pods: 10 (2)
+      requests.cpu: 4000m (3)
+      requests.memory: 8Gi (4)
+      resourcequotas: 1
+      requests.storage: 50Gi (5)
+      persistentvolumeclaims: 5 (6)
+      {{ storageclass name }}.storageclass.storage.k8s.io/requests.storage: 25Gi (7)
+      {{ storageclass name  }}.storageclass.storage.k8s.io/persistentvolumeclaims: 0 (8)
+```
+1. While only one quota can be defined in a *Project*, it still needs a unique
+name/id.
+2. The total number of pods in a non-terminal state that can exist in the project.
+3. CPUs are measured in "milicores". More information on how
+Kubernetes/OpenShift calculates cores can be found in the
+link:https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[upstream
+documentation^].
+4. There is a system of both `limits` and `requests` that we will discuss more
+when we get to the *LimitRange* object.
+5. Across all persistent volume claims in a project, the sum of storage requested cannot exceed this value.
+6. The total number of persistent volume claims in a project.
+7. This setting limits the amount of storage that can be provisioned using the `storageclass name ` *StorageClass*.
+8. This setting limits the number of **PersistentVolumeClaims** for a **StorageClass** called . A value of 0 means that creating **PersistentVolumeClaims** from this storage class is not allowed in this project.
+
+For more details on the available quota options, refer back to the
+link:https://docs.openshift.com/container-platform/3.11/admin_guide/quota.html[quota
+documentation^].
+
+
+## To create a ResourceQuota
+
+```
+oc create -f <ResourceQuota Template>
+```
+
+## To get the list of ResourceQuota defined in a project
+
+```
+oc get quota -n <project name>
+NAME                AGE
+besteffort          11m
+compute-resources   2m
+object-counts       29m
+```
+
+## To get the details of a specific ResourceQuota
+
+```
+oc describe quota object-counts -n <project name>
+Name:			object-counts
+Namespace:		demoproject
+Resource		Used	Hard
+--------		----	----
+configmaps		3	10
+persistentvolumeclaims	0	4
+replicationcontrollers	3	20
+secrets			9	10
+services		2	10
+```
+
+
+# ClusterResourceQuota
+A multi-project quota, defined by a ClusterResourceQuota object, allows quotas to be shared across multiple projects. Resources used in each selected project will be aggregated and that aggregate will be used to limit resources across all the selected projects.
+
+## Selecting Projects
+
+## For Request User
+
+You can select projects based on annotation selection, label selection, or both. For example, to select projects based on annotations, run the following command:
+
+```
+oc create clusterquota for-user \
+     --project-annotation-selector openshift.io/requester=<user-name> \
+     --hard pods=10 \
+     --hard secrets=20
+```
+
+It creates the following ClusterResourceQuota object:
+
+
+```
+apiVersion: v1
+kind: ClusterResourceQuota
+metadata:
+  name: for-user
+spec:
+  quota: 1
+    hard:
+      pods: "10"
+      secrets: "20"
+  selector:
+    annotations: 2
+      openshift.io/requester: <user-name>
+    labels: null 3
+status:
+  namespaces: 4
+  - namespace: ns-one
+    status:
+      hard:
+        pods: "10"
+        secrets: "20"
+      used:
+        pods: "1"
+        secrets: "9"
+  total: 5
+    hard:
+      pods: "10"
+      secrets: "20"
+    used:
+      pods: "1"
+      secrets: "9"
+
+```
+
+ 1. The ResourceQuotaSpec object that will be enforced over the selected projects.
+ 2. A simple key/value selector for annotations.
+ 3. A label selector that can be used to select projects.
+ 4. A per-namespace map that describes current quota usage in each selected project.
+ 5. The aggregate usage across all selected projects.
+ 
+ 
+This multi-project quota document controls all projects requested by <user-name> using the default project request endpoint. You are limited to 10 pods and 20 secrets.
+
+
+## Based on project label
+
+To select projects based on labels, run this command:
+
+```
+oc create clusterresourcequota for-name \ 1
+    --project-label-selector=name=frontend \ 2
+    --hard=pods=10 --hard=secrets=20
+```
+
+ 1. Both clusterresourcequota and clusterquota are aliases of the same command. for-name is the name of the clusterresourcequota object.
+ 
+ 2. To select projects by label, provide a key-value pair by using the format --project-label-selector=key=value.
+
+# LimitRange
 
 Limit ranges are set by cluster administrators and are scoped to a given project.
 
@@ -164,6 +312,3 @@ resource-limits   2d
 oc describe limits resource-limits
 ```
 
-
-# ClusterResourceQuota
-# LimitRange
