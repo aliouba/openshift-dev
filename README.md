@@ -90,155 +90,80 @@ oc adm policy add-cluster-role-to-group cluster-admin  ocp-admin
 ```
 
 # LimitRange
+# ResourceQuota
+
+Limit ranges are set by cluster administrators and are scoped to a given project.
+
+LimitRange  Example
+```
+apiVersion: "v1"
+kind: "LimitRange"
+metadata:
+  name: "resource-limits" 1
+spec:
+  limits:
+    -
+      type: "Pod"
+      max:
+        cpu: "2" 2
+        memory: "1Gi" 3
+      min:
+        cpu: "200m" 4
+        memory: "6Mi" 5
+    -
+      type: "Container"
+      max:
+        cpu: "2" 6
+        memory: "1Gi" 7
+      min:
+        cpu: "100m" 8
+        memory: "4Mi" 9
+      default:
+        cpu: "300m" 10
+        memory: "200Mi" 11
+      defaultRequest:
+        cpu: "200m" 12
+        memory: "100Mi" 13
+      maxLimitRequestRatio:
+        cpu: "10" 14
+```
+
+ 1. The name of the limit range object.
+ 2. The maximum amount of CPU that a pod can request on a node across all containers.
+ 3. The maximum amount of memory that a pod can request on a node across all containers.
+ 4. The minimum amount of CPU that a pod can request on a node across all containers.
+ 5. The minimum amount of memory that a pod can request on a node across all containers.
+ 6. The maximum amount of CPU that a single container in a pod can request.
+ 7. The maximum amount of memory that a single container in a pod can request.
+ 8. The minimum amount of CPU that a single container in a pod can request.
+ 9. The minimum amount of memory that a single container in a pod can request.
+ 10. The default amount of CPU that a container will be limited to use if not specified.
+ 11. The default amount of memory that a container will be limited to use if not specified.
+ 12. The default amount of CPU that a container will request to use if not specified.
+ 13. The default amount of memory that a container will request to use if not specified.
+ 14. The maximum amount of CPU burst that a container can make as a ratio of its limit over request.
 
 
-Take note that there are two new sections added: *ResourceQuota* and
-*LimitRange*.
+## To create a Limit Range
 
-### Background: ResourceQuota
-The
-link:https://docs.openshift.com/container-platform/3.11/admin_guide/quota.html[quota
-documentation^] provides a great description of what *ResourceQuota* is about:
+```
+oc create -f <LimitRange Template>
+```
 
-----
-A resource quota, defined by a ResourceQuota object, provides constraints that
-limit aggregate resource consumption per project. It can limit the quantity of
-objects that can be created in a project by type, as well as the total amount of
-compute resources and storage that may be consumed by resources in that
-project.
-----
+## To get the list of limit ranges defined in a project
 
-In our case, we are setting a specific set of quota for CPU, memory, storage,
-volume claims, and *Pods*. Take a look at the `ResourceQuota` section from the
-`project_request_template.yaml` file:
+```
+oc get limits -n <project name>
+NAME              AGE
+resource-limits   2d
+```
 
-[source,yaml]
-----
-- apiVersion: v1
-  kind: ResourceQuota
-  metadata:
-    name: ${PROJECT_NAME}-quota <1>
-  spec:
-    hard:
-      pods: 10 <2>
-      requests.cpu: 4000m <3>
-      requests.memory: 8Gi <4>
-      resourcequotas: 1
-      requests.storage: 50Gi <5>
-      persistentvolumeclaims: 5 <6>
-      {{ CNS_STORAGECLASS }}.storageclass.storage.k8s.io/requests.storage: 25Gi <7>
-      {{ CNS_BLOCK_STORAGECLASS }}.storageclass.storage.k8s.io/persistentvolumeclaims: 0 <8>
-----
+## To get the details of a specific LimitRange
 
-<1> While only one quota can be defined in a *Project*, it still needs a unique
-name/id.
-<2> The total number of pods in a non-terminal state that can exist in the project.
-<3> CPUs are measured in "milicores". More information on how
-Kubernetes/OpenShift calculates cores can be found in the
-link:https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[upstream
-documentation^].
-<4> There is a system of both `limits` and `requests` that we will discuss more
-when we get to the *LimitRange* object.
-<5> Across all persistent volume claims in a project, the sum of storage requested cannot exceed this value.
-<6> The total number of persistent volume claims in a project.
-<7> This setting limits the amount of storage that can be provisioned using the `glusterfs-storage` *StorageClass*.
-<8> This setting limits the number of **PersistentVolumeClaims** for a **StorageClass** called `{{ CNS_BLOCK_STORAGECLASS }}`. A value of 0 means that creating **PersistentVolumeClaims** from this storage class is not allowed in this project.
+```
+oc describe limits resource-limits
+```
 
-For more details on the available quota options, refer back to the
-link:https://docs.openshift.com/container-platform/3.11/admin_guide/quota.html[quota
-documentation^].
 
-### Background: LimitRange
-The
-link:https://docs.openshift.com/container-platform/3.11/admin_guide/limits.html[limit
-range documentation^] provides some good background:
-
-----
-A limit range, defined by a LimitRange object, enumerates compute resource
-constraints in a project at the pod, container, image, image stream, and
-persistent volume claim level, and specifies the amount of resources that a pod,
-container, image, image stream, or persistent volume claim can consume.
-----
-
-While the quota sets an upper bound on the total resource consumption within a
-project, the `LimitRange` generally applies to individual resources. For
-example, setting how much CPU an individual *Pod* or container can use.
-
-Take a look at the sample `LimitRange` definition that we have provided in the
-`project_request_template.yaml` file:
-
-[source,yaml]
-----
-- apiVersion: v1
-  kind: LimitRange
-  metadata:
-    name: ${PROJECT_NAME}-limits
-    creationTimestamp: null
-  spec:
-    limits:
-      -
-        type: Container
-        max: <1>
-          cpu: 4000m
-          memory: 1024Mi
-        min: <2>
-          cpu: 10m
-          memory: 5Mi
-        default: <3>
-          cpu: 4000m
-          memory: 1024Mi
-        defaultRequest: <4>
-          cpu: 100m
-          memory: 512Mi
-----
-
-The difference between requests and default limits is important, and is covered
-in the link:https://docs.openshift.com/container-platform/3.11/admin_guide/limits.html[limit
-range documentation^]. But, generally speaking:
-
-<1> `max` is the highest value that may be specified for limits and requests
-<2> `min` is the lowest value that may be specified for limits and requests
-<3> `default` is the maximum amount (limit) that the container may consume, when
-nothing is specified
-<4> `defaultRequest` is the minimum amount that the container may consume, when
-nothing is specified
-
-In addition to these topics, there are things like *Quality of Service Tiers* as
-well as a *Limit* : *Request* ratio. There is additionally more information in
-the
-link:https://docs.openshift.com/container-platform/3.11/dev_guide/compute_resources.html[compute
-resources^] section of the documentation.
-
-For the sake of brevity, suffice it to say that there is a complex and powerful
-system of Quality of Service and resource management in OpenShift. Understanding
-the types of workloads that will be run in your cluster will be important to
-coming up with sensible values for all of these settings.
-
-The settings we provide for you in these examples generally restrict projects to:
-
-* A total CPU quota of 4 cores (`4000m`) where
-** Individual containers
-*** must use 4 cores or less
-*** cannot be defined with less than 10 milicores
-*** will default to a request of 100 milicores (if not specified)
-*** may burst up to a limit of 4 cores (if not specified)
-* A total memory usage of 8 Gibibyte (8192 Megabytes) where
-** Individual containers
-*** must use 1 Gi or less
-*** cannot be defined with less than 5 Mi
-*** will default to a request of 512 Mi
-*** may burst up to a limit of 1024 Mi
-* Total storage claims of 25 Gi or less
-* A total number of 5 volume claims
-* 10 or less *Pods*
-
-In combination with quota, you can create very fine-grained controls, even
-across projects, for how users are allowed to request and utilize OpenShift's
-various resources.
-
-NOTE: Remember that quotas and limits are applied at the *Project* level. *Users*
-may have access to multiple *Projects*, but quotas and limits do not apply
-directly to *Users*. If you want to apply one quota across multiple *Projects*,
-then you should look at the
-link:https://docs.openshift.com/container-platform/3.11/admin_guide/multiproject_quota.html[multi-project
-quota^] documentation. We will not cover multi-project quota in these exercises.
+# ClusterResourceQuota
+# LimitRange
